@@ -1,23 +1,65 @@
 const express = require("express");
-const { ServerConfig } = require("./config");
+const { ServerConfig, Logger } = require("./config");
 const apiRoutes = require("./routes");
+const rateLimit = require("express-rate-limit");
 const { errorHandler } = require("./middlewares");
 const morgan = require("morgan");
+const proxy = require("express-http-proxy");
+const cors = require("cors");
 
 const app = express();
+
+// Rate limiter
+const limiter = rateLimit({
+  windowMs: 2 * 60 * 1000, // 2 minutes
+  max: 30, // Limit each IP to 30 requests per window
+});
 
 //* Middlewares
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan("dev"));
+app.use(limiter);
+app.use(cors());
 
-//routes
+// Log configured service URLs
+Logger.info(`User Service: ${ServerConfig.USER_SERVICE}`);
+Logger.info(`Hotel Service: ${ServerConfig.HOTEL_SERVICE}`);
+
+// --------- Proxy Configurations ---------
+
+// Users service proxy
+app.use(
+  "/api/v1",
+  proxy(ServerConfig.USER_SERVICE, {
+    proxyReqPathResolver: (req) => req.originalUrl,
+    proxyErrorHandler: (err, res, next) => {
+      Logger.error(`Users service proxy error: ${err.message}`);
+      res.status(500).json({ error: "User service unavailable" });
+    },
+  })
+);
+
+// Hotels service proxy
+app.use(
+  "/api/v1",
+  proxy(ServerConfig.HOTEL_SERVICE, {
+    proxyReqPathResolver: (req) => req.originalUrl, // forward the full path as-is
+    proxyErrorHandler: (err, res, next) => {
+      Logger.error(`Hotel service proxy error: ${err.message}`);
+      res.status(500).json({ error: "Hotel service unavailable" });
+    },
+  })
+);
+
+// --------- API Gateway routes ---------
 app.use("/api", apiRoutes);
 
-//* Error Handler
+// --------- Global Error Handler ---------
 app.use(errorHandler);
 
-//Server starting
+// --------- Start Server ---------
 app.listen(ServerConfig.PORT, () => {
-  console.log(`Server started at PORT ${ServerConfig.PORT}`);
+  Logger.info(`🚀 API Gateway started at PORT ${ServerConfig.PORT}`);
+  Logger.info("Press Ctrl+C to stop the server.");
 });

@@ -7,7 +7,10 @@ const customFormat = printf(({ level, message, timestamp }) => {
 
 const logger = createLogger({
   format: combine(timestamp(), customFormat),
-  transports: [new transports.File({ filename: "combined.log" })],
+  transports: [
+    new transports.Console(),
+    new transports.File({ filename: "combined.log" }),
+  ],
 });
 
 module.exports = logger;
