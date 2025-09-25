@@ -25,29 +25,49 @@ app.use(cors());
 // Log configured service URLs
 Logger.info(`User Service: ${ServerConfig.USER_SERVICE}`);
 Logger.info(`Hotel Service: ${ServerConfig.HOTEL_SERVICE}`);
+Logger.info(`Booking Service: ${ServerConfig.BOOKING_SERVICE}`);
 
 // --------- Proxy Configurations ---------
 
-// Users service proxy
+// Hotel Service Proxy
+app.use(
+  "/api/v1",
+  proxy(ServerConfig.HOTEL_SERVICE, {
+    filter: (req) => {
+      return req.path.startsWith("/hotels") || req.path.startsWith("/rooms");
+    },
+    proxyReqPathResolver: (req) => req.originalUrl,
+    proxyErrorHandler: (err, res, next) => {
+      Logger.error(`Hotel service proxy error: ${err.message}`);
+      res.status(500).json({ error: "Hotel service unavailable" });
+    },
+  })
+);
+
+// User Service Proxy
 app.use(
   "/api/v1",
   proxy(ServerConfig.USER_SERVICE, {
+    filter: (req) => {
+      return req.path.startsWith("/users") || req.path.startsWith("/auth");
+    },
     proxyReqPathResolver: (req) => req.originalUrl,
     proxyErrorHandler: (err, res, next) => {
-      Logger.error(`Users service proxy error: ${err.message}`);
+      Logger.error(`User service proxy error: ${err.message}`);
       res.status(500).json({ error: "User service unavailable" });
     },
   })
 );
 
-// Hotels service proxy
+// Booking Service Proxy
 app.use(
   "/api/v1",
-  proxy(ServerConfig.HOTEL_SERVICE, {
-    proxyReqPathResolver: (req) => req.originalUrl, // forward the full path as-is
+  proxy(ServerConfig.BOOKING_SERVICE, {
+    filter: (req) => req.path.startsWith("/bookings"),
+    proxyReqPathResolver: (req) => req.originalUrl,
     proxyErrorHandler: (err, res, next) => {
-      Logger.error(`Hotel service proxy error: ${err.message}`);
-      res.status(500).json({ error: "Hotel service unavailable" });
+      Logger.error(`Booking service proxy error: ${err.message}`);
+      res.status(500).json({ error: "Booking service unavailable" });
     },
   })
 );

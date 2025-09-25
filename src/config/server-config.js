@@ -5,4 +5,5 @@ module.exports = {
   HOTEL_SERVICE: process.env.HOTEL_SERVICE,
   BOOKING_SERVICE: process.env.BOOKING_SERVICE,
   USER_SERVICE: process.env.USER_SERVICE,
+  NOTIFICATION_SERVICE: process.env.NOTIFICATION_SERVICE,
 };
