@@ -7,9 +7,10 @@ const morgan = require("morgan");
 const proxy = require("express-http-proxy");
 const cors = require("cors");
 const { v4: uuidv4 } = require("uuid");
+const helmet = require("helmet");
 
 const { Enums } = require("./utils/commons");
-const { USER } = Enums.ROLE_TYPE;
+const { USER, ADMIN } = Enums.ROLE_TYPE;
 
 const app = express();
 
@@ -17,6 +18,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
+app.use(helmet());
 app.use(morgan("dev"));
 
 // Generate a correlation ID for each request
@@ -40,12 +42,52 @@ Logger.info(`User Service: ${ServerConfig.USER_SERVICE}`);
 Logger.info(`Hotel Service: ${ServerConfig.HOTEL_SERVICE}`);
 Logger.info(`Booking Service: ${ServerConfig.BOOKING_SERVICE}`);
 
+// API Documentation endpoint
+app.get("/api/docs", (req, res) => {
+  res.json({
+    name: "Hotel Booking API Gateway",
+    version: "1.0.0",
+    description: "Central API Gateway for Hotel Booking Microservices",
+    correlationId: req.correlationId,
+    timestamp: new Date().toISOString(),
+    documentation: {
+      interactive: `http://${req.headers.host}/api-docs`,
+      health: `http://${req.headers.host}/health`,
+    },
+    authentication: {
+      type: "JWT Bearer Token",
+      required: "For all endpoints except /auth and /health",
+    },
+    rateLimiting: {
+      window: "2 minutes",
+      maxRequests: "30 per IP",
+    },
+    services: [
+      {
+        name: "User Service",
+        status: "connected",
+        endpoints: ["/auth/*", "/users/*"],
+      },
+      {
+        name: "Hotel Service",
+        status: "connected",
+        endpoints: ["/hotels/*", "/rooms/*"],
+      },
+      {
+        name: "Booking Service",
+        status: "connected",
+        endpoints: ["/bookings/*"],
+      },
+    ],
+  });
+});
+
 // ----------------- JWT Middleware -----------------
 // Apply JWT validation to protected routes
 app.use(
   "/api/v1/users",
   AuthMiddlewares.checkAuth,
-  AuthMiddlewares.authorizeRoles([USER])
+  AuthMiddlewares.authorizeRoles([USER, ADMIN])
 );
 app.use(
   "/api/v1/bookings",
@@ -116,6 +158,9 @@ app.use(errorHandler);
 // ----------------- Start Server -----------------
 app.listen(ServerConfig.PORT, () => {
   Logger.info(`🚀 API Gateway started at PORT ${ServerConfig.PORT}`);
+  Logger.info(
+    `📖 API docs available at http://localhost:${ServerConfig.PORT}/api/docs`
+  );
   Logger.info("Press Ctrl+C to stop the server.");
 });
 
@@ -123,4 +168,4 @@ app.listen(ServerConfig.PORT, () => {
 process.on("SIGINT", () => {
   Logger.info("Shutting down API Gateway...");
   process.exit(0);
-});
+}); // CTRL + C
